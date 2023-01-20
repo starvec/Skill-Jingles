@@ -1,13 +1,13 @@
-package com.example;
+package com.skilljingles;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class ExamplePluginTest
+public class SkillJinglesPluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(ExamplePlugin.class);
+		ExternalPluginManager.loadBuiltin(SkillJinglesPlugin.class);
 		RuneLite.main(args);
 	}
 }

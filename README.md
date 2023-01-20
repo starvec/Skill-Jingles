@@ -1,2 +1,2 @@
-# Example
-An example greeter plugin
+# Skill Jingles
+This Runelite plugin enables skill jingles (the short bits of music that play when one of your skill's level increases) even when the in-game music is muted.  Normally, muting the in-game music also disables these jingles.
