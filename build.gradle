@@ -22,9 +22,7 @@ dependencies {
 	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
 	testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
 
-	implementation files('lib/vorbisspi.jar')
 	implementation files('lib/java-vorbis-support-1.2.1.jar')
-	implementation files('lib/tritonus-share-0.3.7.4.jar')
 }
 
 group = 'com.skilljingles'
