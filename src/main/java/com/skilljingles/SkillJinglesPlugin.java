@@ -110,6 +110,7 @@ public class SkillJinglesPlugin extends Plugin
 							jingleIndex += specialJingleOffset;
 						}
 
+						log.info("Playing jingle " + jingleFiles[jingleIndex]);
 						playJingle(jingleFiles[jingleIndex]);
 					}
 				}
@@ -136,8 +137,7 @@ public class SkillJinglesPlugin extends Plugin
 					final AudioFormat outFormat = getOutFormat(in.getFormat());
 					final Info info = new Info(SourceDataLine.class, outFormat);
 
-					try (final SourceDataLine line =
-								 (SourceDataLine) AudioSystem.getLine(info)) {
+					try (final SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info)) {
 
 						Thread.sleep(600);
 
@@ -151,6 +151,8 @@ public class SkillJinglesPlugin extends Plugin
 								float dB = (float) (Math.log(gain) / Math.log(10.0) * 20.0);
 								gainControl.setValue(dB);
 							}
+							else
+								log.info("Was not able to set SourceDataLine volume");
 
 							line.start();
 							stream(getAudioInputStream(outFormat, in), line);
@@ -158,13 +160,13 @@ public class SkillJinglesPlugin extends Plugin
 							line.stop();
 						}
 					} catch (InterruptedException e) {
-						throw new RuntimeException(e);
+						log.info(e.getMessage());
 					}
 
 				} catch (UnsupportedAudioFileException
 						 | LineUnavailableException
 						 | IOException e) {
-					throw new IllegalStateException(e);
+					log.info(e.getMessage());
 				}
 			}
 		});
@@ -188,21 +190,24 @@ public class SkillJinglesPlugin extends Plugin
 	// reads the file containing which version of a skill's jingles should be played at each level and writes that information to the skillJingleVersions array
 	private void initJingleVersions(String jingleVersionPath) throws IOException {
 		InputStream stream = getClass().getClassLoader().getResourceAsStream(jingleVersionPath);
-		BufferedReader br = new BufferedReader(new InputStreamReader(stream));
+		if (stream != null) {
+			BufferedReader br = new BufferedReader(new InputStreamReader(stream));
 
-		String line;
-		String[] tempArr;
+			String line;
+			String[] tempArr;
 
-		int s = 0;
-		br.readLine(); // skip headers
-		while((line = br.readLine()) != null)
-		{
-			tempArr = line.split(",");
-			for (int l = 1; l <= 99; l++) {
-				skillJingleVersion[s][l-1] = (tempArr[l].equals("1"));
-				System.out.println(Skill.values()[s].getName() + " " + l + ": " + tempArr[l].equals("1"));
+			int s = 0;
+			br.readLine(); // skip headers
+			while ((line = br.readLine()) != null) {
+				tempArr = line.split(",");
+				for (int l = 1; l <= 99; l++) {
+					skillJingleVersion[s][l - 1] = (tempArr[l].equals("1"));
+				}
+				s++;
 			}
-			s++;
+		}
+		else {
+			log.info("Could not read jingle versions configuration, InputStream was null");
 		}
 	}
 }
