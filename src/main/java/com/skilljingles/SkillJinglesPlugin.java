@@ -12,6 +12,8 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
 import java.io.*;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import net.runelite.api.events.GameTick;
 import javax.sound.sampled.*;
 import javax.sound.sampled.DataLine.Info;
@@ -29,18 +31,23 @@ public class SkillJinglesPlugin extends Plugin
 			"attack2.ogg", "defence2.ogg", "strength2.ogg", "hitpoints2.ogg", "ranged2.ogg", "prayer2.ogg", "magic2.ogg", "cooking2.ogg", "woodcutting2.ogg", "fletching2.ogg", "fishing2.ogg", "firemaking2.ogg", "crafting2.ogg", "smithing2.ogg", "mining2.ogg", "herblore2.ogg", "agility2.ogg", "thieving2.ogg", "slayer2.ogg", "farming2.ogg", "runecraft2.ogg", "hunter2.ogg", "construction2.ogg"};
 
 	// index offset to get from one version of a jingle to another
-	private final int specialJingleOffset = 23;
+	private final int specialJingleOffset = Skill.values().length;
 
 	// holds the players current skill levels
 	// used to detect when a skill level increases
-	private int[] skillLevels = new int[23];
+	private int[] skillLevels = new int[Skill.values().length];
 
 	// if false, the skillLevels array has not been set up with the player's skill levels
 	private boolean initSkillLevels = false;
 
+	// holds skills who are waiting to play their jingles
+	private Queue<Skill> jingleQueue = new PriorityQueue<>();
+
+	private boolean jinglePlaying = false;
+
 	// contains which version of a skill's jingle should be played at each level
 	// for more information, visit https://oldschool.runescape.wiki/w/Jingles
-	private boolean[][] skillJingleVersion = new boolean[23][99];
+	private boolean[][] skillJingleVersion = new boolean[Skill.values().length][99];
 
 	@Inject
 	private Client client;
@@ -71,18 +78,10 @@ public class SkillJinglesPlugin extends Plugin
 	@Subscribe
 	public void onStatChanged(StatChanged statChanged)
 	{
-		if (config.testMode() && initSkillLevels)
+		if (initSkillLevels && config.testMode())
 		{
-			Skill skill = statChanged.getSkill();
-
-			int jingleIndex = skill.ordinal();
-			int level = client.getRealSkillLevel(skill);
-
-			if (skillJingleVersion[skill.ordinal()][level]) {
-				jingleIndex += specialJingleOffset;
-			}
-
-			playJingle(jingleFiles[jingleIndex]);
+			Skill thisSkill = statChanged.getSkill();
+			jingleQueue.add(thisSkill);
 		}
 	}
 
@@ -90,7 +89,24 @@ public class SkillJinglesPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		for (int s = 0; s < 23; s++) {
+		if (!jingleQueue.isEmpty() && !jinglePlaying)
+		{
+			Skill queuedSkill = jingleQueue.poll();
+			int level = client.getRealSkillLevel(queuedSkill);
+
+			int jingleIndex = queuedSkill.ordinal();
+
+			// check if this should be the alternate jingle and if so offset index
+			if (skillJingleVersion[Skill.ATTACK.ordinal()][level]) {
+				jingleIndex += specialJingleOffset;
+			}
+
+			log.info("Playing jingle " + jingleFiles[jingleIndex]);
+			playJingle(jingleFiles[jingleIndex]);
+		}
+
+		for (int s = 0; s < Skill.values().length; s++)
+		{
 			Skill thisSkill = Skill.values()[s];
 
 			int newSkillLevel = client.getRealSkillLevel(thisSkill);
@@ -104,14 +120,7 @@ public class SkillJinglesPlugin extends Plugin
 					skillLevels[s] = newSkillLevel;
 
 					if (config.playOnUnmute() || client.getMusicVolume() == 0) {
-						int jingleIndex = s;
-
-						if (skillJingleVersion[Skill.ATTACK.ordinal()][newSkillLevel]) {
-							jingleIndex += specialJingleOffset;
-						}
-
-						log.info("Playing jingle " + jingleFiles[jingleIndex]);
-						playJingle(jingleFiles[jingleIndex]);
+						jingleQueue.add(thisSkill);
 					}
 				}
 			}
@@ -119,7 +128,6 @@ public class SkillJinglesPlugin extends Plugin
 			else {
 				skillLevels[s] = newSkillLevel;
 			}
-
 		}
 		initSkillLevels = true;
 	}
@@ -127,50 +135,49 @@ public class SkillJinglesPlugin extends Plugin
 	// plays the provided audio resource
 	private void playJingle(String file)
 	{
-		Thread t1 = new Thread(new Runnable() {
+		Thread playerThread = new Thread(new Runnable()
+		{
 			@Override
 			public void run() {
 				InputStream stream = getClass().getClassLoader().getResourceAsStream(file);
 
-				try (final AudioInputStream in = getAudioInputStream(stream)) {
-
+				try {
+					jinglePlaying = true;
+					final AudioInputStream in = getAudioInputStream(stream);
 					final AudioFormat outFormat = getOutFormat(in.getFormat());
 					final Info info = new Info(SourceDataLine.class, outFormat);
+					final SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info);
 
-					try (final SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info)) {
+					if (line != null)
+					{
+						line.open(outFormat);
 
-						Thread.sleep(600);
-
-						if (line != null) {
-							line.open(outFormat);
-
-							if (line.isControlSupported(FloatControl.Type.MASTER_GAIN))
-							{
-								FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-								double gain = Math.min(Math.max(config.volume()/100D, 0D), 100D);
-								float dB = (float) (Math.log(gain) / Math.log(10.0) * 20.0);
-								gainControl.setValue(dB);
-							}
-							else
-								log.info("Was not able to set SourceDataLine volume");
-
-							line.start();
-							stream(getAudioInputStream(outFormat, in), line);
-							line.drain();
-							line.stop();
+						if (line.isControlSupported(FloatControl.Type.MASTER_GAIN))
+						{
+							FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+							double gain = Math.min(Math.max(config.volume()/100D, 0D), 100D);
+							float dB = (float) (Math.log(gain) / Math.log(10.0) * 20.0);
+							gainControl.setValue(dB);
 						}
-					} catch (InterruptedException e) {
-						log.info(e.getMessage());
-					}
+						else
+							log.info("Was not able to set SourceDataLine volume");
 
-				} catch (UnsupportedAudioFileException
-						 | LineUnavailableException
-						 | IOException e) {
+						line.start();
+						stream(getAudioInputStream(outFormat, in), line);
+						line.drain();
+						line.stop();
+						jinglePlaying = false;
+					}
+				}
+				catch (UnsupportedAudioFileException | LineUnavailableException | IOException e)
+				{
 					log.info(e.getMessage());
+					jinglePlaying = false;
 				}
 			}
 		});
-		t1.start();
+		playerThread.setName("SkillJinglesPlayer");
+		playerThread.start();
 	}
 
 	private AudioFormat getOutFormat(AudioFormat inFormat) {
