@@ -12,6 +12,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import net.runelite.api.events.GameTick;
@@ -26,13 +27,6 @@ import static javax.sound.sampled.AudioSystem.*;
 )
 public class SkillJinglesPlugin extends Plugin
 {
-	// file names for each skill jingle
-	private final String[] jingleFiles = {"attack.ogg", "defence.ogg", "strength.ogg", "hitpoints.ogg", "ranged.ogg", "prayer.ogg", "magic.ogg", "cooking.ogg", "woodcutting.ogg", "fletching.ogg", "fishing.ogg", "firemaking.ogg", "crafting.ogg", "smithing.ogg", "mining.ogg", "herblore.ogg", "agility.ogg", "thieving.ogg", "slayer.ogg", "farming.ogg", "runecraft.ogg", "hunter,ogg", "construction.ogg",
-			"attack2.ogg", "defence2.ogg", "strength2.ogg", "hitpoints2.ogg", "ranged2.ogg", "prayer2.ogg", "magic2.ogg", "cooking2.ogg", "woodcutting2.ogg", "fletching2.ogg", "fishing2.ogg", "firemaking2.ogg", "crafting2.ogg", "smithing2.ogg", "mining2.ogg", "herblore2.ogg", "agility2.ogg", "thieving2.ogg", "slayer2.ogg", "farming2.ogg", "runecraft2.ogg", "hunter2.ogg", "construction2.ogg"};
-
-	// index offset to get from one version of a jingle to another
-	private final int specialJingleOffset = Skill.values().length;
-
 	// holds the players current skill levels
 	// used to detect when a skill level increases
 	private int[] skillLevels = new int[Skill.values().length];
@@ -94,15 +88,18 @@ public class SkillJinglesPlugin extends Plugin
 			Skill queuedSkill = jingleQueue.poll();
 			int level = client.getRealSkillLevel(queuedSkill);
 
-			int jingleIndex = queuedSkill.ordinal();
+			String jingleResourceName;
 
-			// check if this should be the alternate jingle and if so offset index
-			if (skillJingleVersion[Skill.ATTACK.ordinal()][level]) {
-				jingleIndex += specialJingleOffset;
+			// check if this should be the alternate jingle and set resource name
+			if (skillJingleVersion[queuedSkill.ordinal()][level-1]) {
+				jingleResourceName = queuedSkill.getName().toLowerCase() + "2.ogg";
+			}
+			else {
+				jingleResourceName = queuedSkill.getName().toLowerCase() + ".ogg";
 			}
 
-			log.info("Playing jingle " + jingleFiles[jingleIndex]);
-			playJingle(jingleFiles[jingleIndex]);
+			log.info("Playing jingle " + jingleResourceName);
+			playJingle(jingleResourceName);
 		}
 
 		for (int s = 0; s < Skill.values().length; s++)
@@ -207,8 +204,8 @@ public class SkillJinglesPlugin extends Plugin
 			br.readLine(); // skip headers
 			while ((line = br.readLine()) != null) {
 				tempArr = line.split(",");
-				for (int l = 1; l <= 99; l++) {
-					skillJingleVersion[s][l - 1] = (tempArr[l].equals("1"));
+				for (int l = 0; l < 99; l++) {
+					skillJingleVersion[s][l] = (tempArr[l+1].equals("1"));
 				}
 				s++;
 			}
