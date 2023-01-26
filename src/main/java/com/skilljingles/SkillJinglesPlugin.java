@@ -12,7 +12,6 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
 import java.io.*;
-import java.util.Arrays;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import net.runelite.api.events.GameTick;
